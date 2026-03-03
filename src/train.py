@@ -102,8 +102,10 @@ def train(args=None):
 
     prepared_data_dir = args.prepared_data_dir
     models_dir = args.models_dir
+    
+    # Ensure models directory exists
+    os.makedirs(models_dir, exist_ok=True)
 
-    print("=" * 60)
     print("Training model with MLflow")
     print("=" * 60)
 
