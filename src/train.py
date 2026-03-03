@@ -1,10 +1,11 @@
 import sys
 import os
+import argparse
 import warnings
 import numpy as np
 import pandas as pd
 import matplotlib
-matplotlib.use('Agg') 
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -24,26 +25,39 @@ from preprocessing import preprocess_features, encode_labels, split_data
 
 warnings.filterwarnings('ignore')
 
-
-# Hyperparameters
-PARAMS = {
-    'n_estimators': 200,
-    'max_depth': 5,
-    'learning_rate': 0.1,
-    'subsample': 0.8,
-    'random_state': 42,
-}
-
-TEST_SIZE = 0.2
-RANDOM_STATE = 42
 EXPERIMENT_NAME = "HAM10000_Skin_Lesion_Classification"
+
+
+def parse_args():
+    """Parse CLI arguments for hyperparameters."""
+    parser = argparse.ArgumentParser(
+        description='Train GradientBoostingClassifier on HAM10000 with MLflow logging'
+    )
+    parser.add_argument('--n_estimators', type=int, default=200,
+                        help='Number of boosting stages (default: 200)')
+    parser.add_argument('--max_depth', type=int, default=5,
+                        help='Maximum depth of individual trees (default: 5)')
+    parser.add_argument('--learning_rate', type=float, default=0.1,
+                        help='Learning rate / shrinkage (default: 0.1)')
+    parser.add_argument('--subsample', type=float, default=0.8,
+                        help='Fraction of samples for fitting trees (default: 0.8)')
+    parser.add_argument('--test_size', type=float, default=0.2,
+                        help='Test set fraction (default: 0.2)')
+    parser.add_argument('--random_state', type=int, default=42,
+                        help='Random seed (default: 42)')
+    parser.add_argument('--author', type=str, default='Yurii Polulikh',
+                        help='Author name for MLflow tag')
+    parser.add_argument('--dataset_version', type=str, default='v1.0',
+                        help='Dataset version for MLflow tag')
+    parser.add_argument('--run_name', type=str, default=None,
+                        help='Optional MLflow run name')
+    return parser.parse_args()
 
 
 def plot_confusion_matrix(y_true, y_pred, labels, save_path: str):
     """Plot and save confusion matrix."""
     cm = confusion_matrix(y_true, y_pred)
     fig, ax = plt.subplots(figsize=(10, 8))
-
     sns.heatmap(
         cm, annot=True, fmt='d', cmap='Blues',
         xticklabels=labels, yticklabels=labels,
@@ -55,14 +69,13 @@ def plot_confusion_matrix(y_true, y_pred, labels, save_path: str):
     plt.tight_layout()
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.close()
-    print(f"Confusion Matrix saved: {save_path}")
+    print(f"   Confusion Matrix saved: {save_path}")
 
 
 def plot_feature_importance(model, top_n: int = 30, save_path: str = 'feature_importance.png'):
     """Plot and save feature importance (top-N)."""
     importances = model.feature_importances_
     indices = np.argsort(importances)[-top_n:]
-
     fig, ax = plt.subplots(figsize=(10, 8))
     ax.barh(range(len(indices)), importances[indices], color='steelblue', edgecolor='white')
     ax.set_yticks(range(len(indices)))
@@ -72,95 +85,134 @@ def plot_feature_importance(model, top_n: int = 30, save_path: str = 'feature_im
     plt.tight_layout()
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.close()
-    print(f"Feature Importance saved: {save_path}")
+    print(f"   Feature Importance saved: {save_path}")
 
 
-def train():
-    """Main function for training with MLflow logging."""
+def train(args=None):
+    """Main training function with MLflow logging."""
+
+    if args is None:
+        args = parse_args()
 
     print("=" * 60)
-    print("STEP 4: Training model with MLflow")
+    print("Training model with MLflow")
     print("=" * 60)
 
-    print("\nLoading data")
+    # 1. Load data
+    print("\n[1/5] Loading data")
     X, y = load_hmnist_data()
 
-    print("\nPreprocessing data")
+    # 2. Preprocess
+    print("\n[2/5] Preprocessing data")
     X_processed = preprocess_features(X)
     y_encoded, label_encoder = encode_labels(y)
 
-    print("\nSplitting data")
+    # 3. Split
+    print("\n[3/5] Splitting data")
     X_train, X_test, y_train, y_test = split_data(
         X_processed, y_encoded,
-        test_size=TEST_SIZE,
-        random_state=RANDOM_STATE
+        test_size=args.test_size,
+        random_state=args.random_state
     )
 
-    print("\nInitializing MLflow")
+    # 4. MLflow init
+    print("\n[4/5] Initializing MLflow")
     mlflow.set_experiment(EXPERIMENT_NAME)
-    print(f"Experiment: {EXPERIMENT_NAME}")
-    print("\nTraining model and logging to MLflow")
+    print(f"   Experiment: {EXPERIMENT_NAME}")
 
-    with mlflow.start_run():
+    # 5. Train and log
+    print("\n[5/5] Training and logging")
 
-        mlflow.log_param("model_type", "GradientBoostingClassifier")
-        mlflow.log_param("n_estimators", PARAMS['n_estimators'])
-        mlflow.log_param("max_depth", PARAMS['max_depth'])
-        mlflow.log_param("learning_rate", PARAMS['learning_rate'])
-        mlflow.log_param("subsample", PARAMS['subsample'])
-        mlflow.log_param("test_size", TEST_SIZE)
-        mlflow.log_param("random_state", RANDOM_STATE)
+    model_params = {
+        'n_estimators': args.n_estimators,
+        'max_depth': args.max_depth,
+        'learning_rate': args.learning_rate,
+        'subsample': args.subsample,
+        'random_state': args.random_state,
+    }
+
+    run_name = args.run_name or f"GBC_depth{args.max_depth}_est{args.n_estimators}_lr{args.learning_rate}"
+
+    with mlflow.start_run(run_name=run_name):
+
+        # MLflow Tags (metadata)
+        mlflow.set_tag("author", args.author)
+        mlflow.set_tag("dataset_version", args.dataset_version)
+        mlflow.set_tag("model_type", "GradientBoostingClassifier")
+        mlflow.set_tag("dataset", "HAM10000")
+        mlflow.set_tag("task", "skin_lesion_classification")
+        print("   Tags set (author, dataset_version, model_type, dataset, task)")
+
+        mlflow.log_param("n_estimators", args.n_estimators)
+        mlflow.log_param("max_depth", args.max_depth)
+        mlflow.log_param("learning_rate", args.learning_rate)
+        mlflow.log_param("subsample", args.subsample)
+        mlflow.log_param("test_size", args.test_size)
+        mlflow.log_param("random_state", args.random_state)
         mlflow.log_param("n_features", X_train.shape[1])
         mlflow.log_param("n_classes", len(label_encoder.classes_))
         print("   Hyperparameters logged")
 
         print(f"\n   Training GradientBoostingClassifier...")
-        print(f"      n_estimators={PARAMS['n_estimators']}, "
-              f"max_depth={PARAMS['max_depth']}, "
-              f"learning_rate={PARAMS['learning_rate']}")
+        print(f"      n_estimators={args.n_estimators}, "
+              f"max_depth={args.max_depth}, "
+              f"learning_rate={args.learning_rate}")
 
-        model = GradientBoostingClassifier(**PARAMS)
+        model = GradientBoostingClassifier(**model_params)
         model.fit(X_train, y_train)
         print("   Model trained!")
 
-        y_pred = model.predict(X_test)
-        accuracy = accuracy_score(y_test, y_pred)
-        f1_weighted = f1_score(y_test, y_pred, average='weighted')
-        f1_macro = f1_score(y_test, y_pred, average='macro')
-        precision = precision_score(y_test, y_pred, average='weighted')
-        recall = recall_score(y_test, y_pred, average='weighted')
+        # Predict on BOTH train and test sets
+        y_pred_train = model.predict(X_train)
+        y_pred_test = model.predict(X_test)
 
-        print(f"\n   Metrics on test set:")
-        print(f"      Accuracy:           {accuracy:.4f}")
-        print(f"      F1 Score (weighted): {f1_weighted:.4f}")
-        print(f"      F1 Score (macro):    {f1_macro:.4f}")
-        print(f"      Precision:           {precision:.4f}")
-        print(f"      Recall:              {recall:.4f}")
+        # Train metrics 
+        train_accuracy = accuracy_score(y_train, y_pred_train)
+        train_f1 = f1_score(y_train, y_pred_train, average='weighted')
 
-        mlflow.log_metric("accuracy", accuracy)
-        mlflow.log_metric("f1_weighted", f1_weighted)
-        mlflow.log_metric("f1_macro", f1_macro)
-        mlflow.log_metric("precision_weighted", precision)
-        mlflow.log_metric("recall_weighted", recall)
-        print("   Metrics logged")
+        mlflow.log_metric("train_accuracy", train_accuracy)
+        mlflow.log_metric("train_f1_weighted", train_f1)
 
+        # Test metrics
+        test_accuracy = accuracy_score(y_test, y_pred_test)
+        test_f1_weighted = f1_score(y_test, y_pred_test, average='weighted')
+        test_f1_macro = f1_score(y_test, y_pred_test, average='macro')
+        test_precision = precision_score(y_test, y_pred_test, average='weighted')
+        test_recall = recall_score(y_test, y_pred_test, average='weighted')
+
+        mlflow.log_metric("test_accuracy", test_accuracy)
+        mlflow.log_metric("test_f1_weighted", test_f1_weighted)
+        mlflow.log_metric("test_f1_macro", test_f1_macro)
+        mlflow.log_metric("test_precision_weighted", test_precision)
+        mlflow.log_metric("test_recall_weighted", test_recall)
+
+        # --- Overfitting gap ---
+        overfit_gap = train_accuracy - test_accuracy
+        mlflow.log_metric("overfit_gap_accuracy", overfit_gap)
+
+        print(f"\n   Train metrics:")
+        print(f"      Accuracy: {train_accuracy:.4f}   F1: {train_f1:.4f}")
+        print(f"   Test metrics:")
+        print(f"      Accuracy: {test_accuracy:.4f}   F1: {test_f1_weighted:.4f}")
+        print(f"      Precision: {test_precision:.4f}  Recall: {test_recall:.4f}")
+        print(f"   Overfit gap (train-test accuracy): {overfit_gap:.4f}")
+
+        # --- Log model ---
         mlflow.sklearn.log_model(model, "gradient_boosting_model")
         print("   Model logged")
 
+        # --- Log artifacts ---
         class_labels = [LABEL_NAMES.get(c, str(c)) for c in sorted(label_encoder.classes_)]
 
         cm_path = "confusion_matrix.png"
-        plot_confusion_matrix(y_test, y_pred, class_labels, cm_path)
+        plot_confusion_matrix(y_test, y_pred_test, class_labels, cm_path)
         mlflow.log_artifact(cm_path)
 
         fi_path = "feature_importance.png"
         plot_feature_importance(model, top_n=30, save_path=fi_path)
         mlflow.log_artifact(fi_path)
-        report = classification_report(
-            y_test, y_pred,
-            target_names=class_labels,
-            digits=4
-        )
+
+        report = classification_report(y_test, y_pred_test, target_names=class_labels, digits=4)
         report_path = "classification_report.txt"
         with open(report_path, 'w') as f:
             f.write("Classification Report\n")
@@ -169,7 +221,8 @@ def train():
         mlflow.log_artifact(report_path)
         print("   Artifacts logged (confusion_matrix, feature_importance, classification_report)")
 
-        print(f"\n   MLflow Run ID: {mlflow.active_run().info.run_id}")
+        run_id = mlflow.active_run().info.run_id
+        print(f"\n   MLflow Run ID: {run_id}")
 
     print("\n" + "=" * 60)
     print("TRAINING COMPLETED SUCCESSFULLY!")
@@ -177,11 +230,15 @@ def train():
     print(f"\nTo view results in MLflow UI, run:")
     print(f"  mlflow ui")
     print(f"  Open: http://127.0.0.1:5000")
-    print(f"\nExperiment: {EXPERIMENT_NAME}")
+    print(f"\nTo filter by tags in MLflow Search:")
+    print(f'  tags.model_type = "GradientBoostingClassifier"')
+    print(f'  tags.author = "{args.author}"')
 
     for f in [cm_path, fi_path, report_path]:
         if os.path.exists(f):
             os.remove(f)
+
+    return run_id
 
 
 if __name__ == '__main__':
