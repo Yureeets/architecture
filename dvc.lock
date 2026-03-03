@@ -1,0 +1,19 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: python src/prepare.py data/raw/hmnist_28_28_L.csv data/prepared
+    deps:
+    - path: data/raw/hmnist_28_28_L.csv
+      hash: md5
+      md5: 95ea723deca16f4a9b763cee398ddb83
+      size: 30807979
+    - path: src/prepare.py
+      hash: md5
+      md5: e70960f4580e43340ed738f2291efdc9
+      size: 1943
+    outs:
+    - path: data/prepared
+      hash: md5
+      md5: 4fe710b144028c151b4f34b34b51b6c6.dir
+      size: 147098974
+      nfiles: 2

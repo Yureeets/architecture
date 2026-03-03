@@ -51,7 +51,13 @@ def parse_args():
                         help='Dataset version for MLflow tag')
     parser.add_argument('--run_name', type=str, default=None,
                         help='Optional MLflow run name')
+    parser.add_argument('prepared_data_dir', type=str, nargs='?', default='data/prepared',
+                        help='Directory with prepared data (default: data/prepared)')
+    parser.add_argument('models_dir', type=str, nargs='?', default='models',
+                        help='Directory to save models (default: models)')
     return parser.parse_args()
+
+
 
 
 def plot_confusion_matrix(y_true, y_pred, labels, save_path: str):
@@ -94,26 +100,34 @@ def train(args=None):
     if args is None:
         args = parse_args()
 
+    prepared_data_dir = args.prepared_data_dir
+    models_dir = args.models_dir
+
     print("=" * 60)
     print("Training model with MLflow")
     print("=" * 60)
 
-    # 1. Load data
-    print("\n[1/5] Loading data")
-    X, y = load_hmnist_data()
+    # 1. Load prepared data
+    print(f"\n[1/5] Loading prepared data from: {prepared_data_dir}")
 
-    # 2. Preprocess
-    print("\n[2/5] Preprocessing data")
-    X_processed = preprocess_features(X)
-    y_encoded, label_encoder = encode_labels(y)
+    train_path = os.path.join(prepared_data_dir, "train.csv")
+    test_path = os.path.join(prepared_data_dir, "test.csv")
+    
+    if not os.path.exists(train_path) or not os.path.exists(test_path):
+        raise FileNotFoundError(f"Prepared data not found in {prepared_data_dir}")
+        
+    train_df = pd.read_csv(train_path)
+    test_df = pd.read_csv(test_path)
+    
+    X_train = train_df.drop('label', axis=1).values
+    y_train = train_df['label'].values
+    
+    X_test = test_df.drop('label', axis=1).values
+    y_test = test_df['label'].values
 
-    # 3. Split
-    print("\n[3/5] Splitting data")
-    X_train, X_test, y_train, y_test = split_data(
-        X_processed, y_encoded,
-        test_size=args.test_size,
-        random_state=args.random_state
-    )
+    # Determine number of classes (for logging)
+    unique_classes = np.unique(np.concatenate([y_train, y_test]))
+    n_classes = len(unique_classes)
 
     # 4. MLflow init
     print("\n[4/5] Initializing MLflow")
@@ -150,8 +164,9 @@ def train(args=None):
         mlflow.log_param("test_size", args.test_size)
         mlflow.log_param("random_state", args.random_state)
         mlflow.log_param("n_features", X_train.shape[1])
-        mlflow.log_param("n_classes", len(label_encoder.classes_))
+        mlflow.log_param("n_classes", n_classes)
         print("   Hyperparameters logged")
+
 
         print(f"\n   Training GradientBoostingClassifier...")
         print(f"      n_estimators={args.n_estimators}, "
@@ -202,7 +217,8 @@ def train(args=None):
         print("   Model logged")
 
         # --- Log artifacts ---
-        class_labels = [LABEL_NAMES.get(c, str(c)) for c in sorted(label_encoder.classes_)]
+        class_labels = [LABEL_NAMES.get(int(c), str(c)) for c in sorted(unique_classes)]
+
 
         cm_path = "confusion_matrix.png"
         plot_confusion_matrix(y_test, y_pred_test, class_labels, cm_path)
