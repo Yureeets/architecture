@@ -2,9 +2,23 @@ __pycache__/
 *.py[cod]
 venv/
 .env
-data/
 models/
 .ipynb_checkpoints
 mlruns/
 .trash/
 .venv
+mlflow.db
+optimize.log
+
+# Artifacts generated during training
+metrics.json
+confusion_matrix.png
+classification_report.txt
+feature_importance.png
+
+# Lab report files
+*.pdf
+*.pages
+
+# OS
+.DS_Store

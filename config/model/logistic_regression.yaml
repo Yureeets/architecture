@@ -1,0 +1,5 @@
+type: "logistic_regression"
+params:
+  C: 1.0
+  solver: "lbfgs"
+  penalty: "l2"

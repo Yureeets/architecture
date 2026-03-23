@@ -1,0 +1,88 @@
+name: Model CI/CD
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Setup Python
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 4. Install CML
+      - name: Install CML
+        run: pip install cml
+
+      # 5. Linting
+      - name: Lint with flake8
+        run: |
+          flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 src/ --count --max-line-length=120 --statistics --exit-zero
+
+      # 6. Pre-train tests (data validation)
+      - name: Run data validation tests
+        run: pytest tests/test_data.py -v
+
+      # 7. Train model
+      - name: Train model
+        run: python src/train_pipeline.py
+
+      # 8. Post-train tests (Quality Gate)
+      - name: Run Quality Gate tests
+        env:
+          F1_THRESHOLD: "0.50"
+          ACC_THRESHOLD: "0.50"
+        run: pytest tests/test_model.py -v
+
+      # 9. CML Report (only on Pull Requests)
+      - name: Create CML report
+        if: github.event_name == 'pull_request'
+        env:
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "## 🧪 Model Training Report" > report.md
+          echo "" >> report.md
+          echo "### Metrics" >> report.md
+          echo '```json' >> report.md
+          cat metrics.json >> report.md
+          echo "" >> report.md
+          echo '```' >> report.md
+          echo "" >> report.md
+          echo "### Confusion Matrix" >> report.md
+          cml publish confusion_matrix.png --md >> report.md
+          echo "" >> report.md
+          echo "### Quality Gate" >> report.md
+          echo "All quality checks passed!" >> report.md
+          cml comment create report.md
+
+      # 10. Upload artifacts
+      - name: Upload training artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-artifacts
+          path: |
+            metrics.json
+            confusion_matrix.png
+            models/model.pkl

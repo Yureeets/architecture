@@ -13,3 +13,11 @@ stages:
       - src/train.py
     outs:
       - models
+  optimize:
+    cmd: python src/optimize.py model=random_forest hpo=optuna
+    deps:
+      - data/raw/hmnist_28_28_L.csv
+      - src/optimize.py
+      - config/config.yaml
+      - config/model
+      - config/hpo

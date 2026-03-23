@@ -9,11 +9,29 @@ stages:
       size: 30807979
     - path: src/prepare.py
       hash: md5
-      md5: e70960f4580e43340ed738f2291efdc9
-      size: 1943
+      md5: 4550363c4f18b7004be294c21754856a
+      size: 1859
     outs:
     - path: data/prepared
       hash: md5
       md5: 4fe710b144028c151b4f34b34b51b6c6.dir
       size: 147098974
       nfiles: 2
+  train:
+    cmd: python src/train.py data/prepared models
+    deps:
+    - path: data/prepared
+      hash: md5
+      md5: 4fe710b144028c151b4f34b34b51b6c6.dir
+      size: 147098974
+      nfiles: 2
+    - path: src/train.py
+      hash: md5
+      md5: 1f57076bd00af7b635da82d0bc184f85
+      size: 10199
+    outs:
+    - path: models
+      hash: md5
+      md5: d751713988987e9331980363e24189ce.dir
+      size: 0
+      nfiles: 0

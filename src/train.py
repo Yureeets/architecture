@@ -35,7 +35,7 @@ def parse_args():
     )
     parser.add_argument('--n_estimators', type=int, default=200,
                         help='Number of boosting stages (default: 200)')
-    parser.add_argument('--max_depth', type=int, default=5,
+    parser.add_argument('--max_depth', type=int, default=чі5,
                         help='Maximum depth of individual trees (default: 5)')
     parser.add_argument('--learning_rate', type=float, default=0.1,
                         help='Learning rate / shrinkage (default: 0.1)')
@@ -103,7 +103,6 @@ def train(args=None):
     prepared_data_dir = args.prepared_data_dir
     models_dir = args.models_dir
     
-    # Ensure models directory exists
     os.makedirs(models_dir, exist_ok=True)
 
     print("Training model with MLflow")

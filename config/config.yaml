@@ -1,0 +1,22 @@
+defaults:
+  - _self_
+  - model: random_forest
+  - hpo: optuna
+
+seed: 42
+
+mlflow:
+  tracking_uri: "mlruns"
+  experiment_name: "HPO_Lab3"
+  log_model: true
+  register_model: false
+  model_name: "BestOptimizedModel"
+  stage: "Staging"
+
+data:
+  processed_path: "data/raw/hmnist_28_28_L.csv"
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
