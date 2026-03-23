@@ -31,9 +31,9 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4. Install CML
-      - name: Install CML
-        run: pip install cml
+      # 4. Setup CML
+      - name: Setup CML
+        uses: iterative/setup-cml@v2
 
       # 5. Linting
       - name: Lint with flake8
