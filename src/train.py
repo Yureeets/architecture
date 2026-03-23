@@ -35,7 +35,7 @@ def parse_args():
     )
     parser.add_argument('--n_estimators', type=int, default=200,
                         help='Number of boosting stages (default: 200)')
-    parser.add_argument('--max_depth', type=int, default=чі5,
+    parser.add_argument('--max_depth', type=int, default=5,
                         help='Maximum depth of individual trees (default: 5)')
     parser.add_argument('--learning_rate', type=float, default=0.1,
                         help='Learning rate / shrinkage (default: 0.1)')
