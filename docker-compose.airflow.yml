@@ -1,0 +1,87 @@
+# version: '3.8'  # obsolete in newer Docker Compose, removed
+
+# Локальне середовище Apache Airflow для оркестрації ML-пайплайну.
+# Використовує LocalExecutor + PostgreSQL.
+# ML-код монтується як volume, задачі запускаються через BashOperator.
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.8.1
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: 'UKMzEm3yIuFYEq1y3-2FxPNWSVwRASpaBoTLZBfl3dE='
+    AIRFLOW__WEBSERVER__SECRET_KEY: 'ml_pipeline_secret_2024'
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    # Шлях до ML-проєкту всередині контейнера
+    ML_PROJECT_PATH: /opt/ml_project
+    # Бінарник Python (той самий, що й в Airflow)
+    PYTHON_BIN: /usr/local/bin/python
+    # Поріг якості для реєстрації моделі
+    ACCURACY_THRESHOLD: '0.50'
+  volumes:
+    # DAG-файли
+    - ./dags:/opt/airflow/dags
+    # Логи Airflow
+    - airflow_logs:/opt/airflow/logs
+    # Монтуємо весь ML-проєкт у контейнер
+    - .:/opt/ml_project
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  airflow-init:
+    <<: *airflow-common
+    command: >
+      bash -c "
+        pip install -r /opt/ml_project/requirements.txt --quiet &&
+        airflow db migrate &&
+        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com
+      "
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: >
+      bash -c "
+        pip install -r /opt/ml_project/requirements.txt --quiet &&
+        airflow scheduler
+      "
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
+  airflow_logs:
