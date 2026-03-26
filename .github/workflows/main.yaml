@@ -23,14 +23,8 @@ jobs:
       - name: Install flake8
         run: pip install flake8
 
-      - name: Lint src/
-        run: flake8 src/ --max-line-length=120 --ignore=E501,W503
-
-      - name: Lint dags/
-        run: flake8 dags/ --max-line-length=120 --ignore=E501,W503
-
-      - name: Lint tests/
-        run: flake8 tests/ --max-line-length=120 --ignore=E501,W503
+      - name: Lint src/, dags/, tests/
+        run: flake8 src/ dags/ tests/
 
   # -----------------------------------------------------------------------
   # Крок 2: DAG Integrity Test — перевірка коректності DAG-файлів
